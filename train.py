@@ -17,7 +17,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data
 import yaml
-from torch.cuda import amp
+from torch import amp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -380,7 +380,7 @@ def train(hyp, opt, device, tb_writer=None):
                     irs = F.interpolate(irs, size=ns, mode='bilinear', align_corners=False) #zjq
 
             # Forward
-            with amp.autocast(enabled=cuda):
+            with amp.autocast(enabled=cuda, device_type='cuda'):
                 # t0 = time.time()
                 if opt.super:# and not opt.attention and not opt.super_attention:
                     pred,output_sr,_ = model(imgs,irs,opt.input_mode)  # forward #zjq
@@ -617,6 +617,9 @@ if __name__ == '__main__':
     parser.add_argument('--save_period', type=int, default=-1, help='Log model after every "save_period" epoch')
     parser.add_argument('--artifact_alias', type=str, default="latest", help='version of dataset artifact to be used')
     opt = parser.parse_args()
+
+    # python3 train.py --cfg models/SRyolo_MF.yaml --super --train_img_size 1024 --hr_input --data data/SRvedai.yaml --ch 64 --input_mode RGB+IR+MF
+
     ######swin####
     #args, unparsed = parser.parse_known_args() 
     #config = get_config(args)

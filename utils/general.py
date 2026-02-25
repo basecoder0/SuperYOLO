@@ -91,7 +91,10 @@ def check_git_status():
 
 def check_requirements(file='requirements.txt', exclude=()):
     # Check installed dependencies meet requirements
-    import pkg_resources as pkg
+    # import pkg_resources as pkg_resources is deprecated, use importlib.metadata instead
+    import importlib.metadata
+    from packaging.requirements import Requirement
+
     prefix = colorstr('red', 'bold', 'requirements:')
     file = Path(file)
     if not file.exists():
@@ -99,10 +102,13 @@ def check_requirements(file='requirements.txt', exclude=()):
         return
 
     n = 0  # number of packages updates
-    requirements = [f'{x.name}{x.specifier}' for x in pkg.parse_requirements(file.open()) if x.name not in exclude]
+    # requirements = [f'{x.name}{x.specifier}' for x in pkg.parse_requirements(file.open()) if x.name not in exclude]
+    requirements = [Requirement(line.split('#')[0].strip()) for line in file.read_text().splitlines() 
+                if line.strip() and not line.startswith('#') and not line.startswith(';') and line.split('#')[0].strip() and line.split()[0] not in exclude]
     for r in requirements:
         try:
-            pkg.require(r)
+            # pkg.require(r)
+            importlib.metadata.version(r.name)
         except Exception as e:  # DistributionNotFound or VersionConflict if requirements not met
             n += 1
             print(f"{prefix} {e.req} not found and is required by YOLOv5, attempting auto-update...")
@@ -213,7 +219,7 @@ def labels_to_class_weights(labels, nc=80):
         return torch.Tensor()
 
     labels = np.concatenate(labels, 0)  # labels.shape = (866643, 5) for COCO
-    classes = labels[:, 0].astype(np.int)  # labels = [class xywh]
+    classes = labels[:, 0].astype(np.int64)  # labels = [class xywh]
     weights = np.bincount(classes, minlength=nc)  # occurrences per class
 
     # Prepend gridpoint count (for uCE training)
@@ -228,7 +234,7 @@ def labels_to_class_weights(labels, nc=80):
 
 def labels_to_image_weights(labels, nc=80, class_weights=np.ones(80)):
     # Produces image weights based on class_weights and image contents
-    class_counts = np.array([np.bincount(x[:, 0].astype(np.int), minlength=nc) for x in labels])
+    class_counts = np.array([np.bincount(x[:, 0].astype(np.int64), minlength=nc) for x in labels])
     image_weights = (class_weights.reshape(1, nc) * class_counts).sum(1)
     # index = random.choices(range(n), weights=image_weights, k=1)  # weight image sample
     return image_weights

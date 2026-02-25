@@ -4,7 +4,7 @@
 
 import os
 import pandas as pd
-PATH = '/home/data4/zjq/'#'/home/data/zhangjiaqing/dataset/' #chanhe the path firstly (PATH TO dataset)
+PATH = '~/SuperYOLO/dataset/'#'/home/data/zhangjiaqing/dataset/' #chanhe the path firstly (PATH TO dataset)
 
 def update_annotations(filename,image_size,label_path,save_path):
     data = pd.read_csv(label_path + filename, sep=' ', index_col=None, header=None, names=['x_center', 'y_center', 'orientation', 'class', 'is_contained', 'is_occluded', 'corner1_x', 'corner2_x', 'corner3_x', 'corner4_x', 'corner1_y', 'corner2_y', 'corner3_y', 'corner4_y'])
