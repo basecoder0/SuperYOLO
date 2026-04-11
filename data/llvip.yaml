@@ -1,0 +1,9 @@
+train: dataset/LLVIP/fold01_write.txt
+test: dataset/LLVIP/fold01test_write.txt
+val: dataset/LLVIP/fold01test_write.txt
+
+
+# Classes
+nc: 1  # number of classes
+
+names: ['person']  # class names

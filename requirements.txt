@@ -27,6 +27,10 @@ pandas
 # extras --------------------------------------
 thop==0.0.31.post2005241907  # FLOPS computation
 pycocotools>=2.0  # COCO mAP
+requests
+numba
+timm
+setuptools
 
 #results
 xlsxwriter>=3.0.1

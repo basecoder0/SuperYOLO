@@ -1,0 +1,15 @@
+# LLVIP Dataset - Low-Light Visible-Infrared Paired Dataset
+# A Visible-infrared Paired Dataset for Low-light Vision
+# Paper: https://arxiv.org/abs/2108.10831
+# Train command: python train.py --data SRllvip.yaml
+
+# train and val data as file paths
+train: dataset/LLVIP/fold01_write.txt
+test: dataset/LLVIP/fold01test_write.txt
+val: dataset/LLVIP/fold01test_write.txt
+
+# number of classes
+nc: 1
+
+# class names
+names: ['person']

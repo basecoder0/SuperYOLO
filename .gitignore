@@ -76,3 +76,9 @@ events.out.tfevents.*
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Datasets, roc_curve outputs
+coco/
+vedai/
+vedai/fusion/exp*/_predictions.json
+*.xlsx
