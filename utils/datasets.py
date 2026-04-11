@@ -390,19 +390,26 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.mosaic = self.augment and not self.rect  # load 4 images at a time into a mosaic (only during training)
         self.mosaic_border = [-img_size // 2, -img_size // 2]
         self.stride = stride
-        if hr_input== False:
-            self.img_path = PATH + '/VEDAI/images/' #zjq the path for 512*512 images
-        else:
-            self.img_path = PATH + '/VEDAI_1024/images/' #zjq the path for 1024*1024 images
 
-
+        # Read fold file to detect dataset format
         with open(path, "r") as file:
             self.img_files = file.readlines()
-            # for i in dele:
-            #     if i+'\n' in self.img_files:
-            #         self.img_files.remove(i+'\n')
+        
+        # Auto-detect dataset format from first line
+        if len(self.img_files) > 0:
+            first_line = self.img_files[0].strip()
+            
+            # Detect dataset type and set appropriate suffix and extension
+            if '/LLVIP/' in first_line:
+                # LLVIP uses .jpg extension
+                suffix = '_co.jpg'
+            else:
+                # VEDAI and M3FD use .png extension
+                suffix = '_co.png'
+            
+            # Apply suffix to all image paths
             for j in range(len(self.img_files)):
-                self.img_files[j] = self.img_path + self.img_files[j].rstrip() + '_co.png' #self.img_files[j].rstrip() + '_co.png'  #self.img_path + self.img_files[j].rstrip() + '_co.png'
+                self.img_files[j] = self.img_files[j].rstrip() + suffix
 
         # Check cache
         self.label_files = img2label_paths(self.img_files)  # labels
@@ -676,13 +683,25 @@ class LoadImagesAndLabels_sr(Dataset):  # for training/testing
         self.mosaic_border = [-img_size // 2, -img_size // 2]
         self.stride = stride
 
+        # Read fold file to detect dataset format
         with open(path, "r") as file:
             self.img_files = file.readlines()
-            # for i in dele:
-            #     if i+'\n' in self.img_files:
-            #         self.img_files.remove(i+'\n')
+        
+        # Auto-detect dataset type and set appropriate suffix and extension
+        if len(self.img_files) > 0:
+            first_line = self.img_files[0].strip()
+            
+            # Detect dataset type and set appropriate suffix and extension
+            if '/LLVIP/' in first_line:
+                # LLVIP uses .jpg extension
+                suffix = '_co.jpg'
+            else:
+                # VEDAI and M3FD use .png extension
+                suffix = '_co.png'
+            
+            # Apply suffix to all image paths
             for j in range(len(self.img_files)):
-                self.img_files[j] = self.img_files[j].rstrip() + '_co.png'  #self.img_path + self.img_files[j].rstrip() + '_co.png'
+                self.img_files[j] = self.img_files[j].rstrip() + suffix
 
         # Check cache
         self.label_files = img2label_paths(self.img_files)  # labels
@@ -743,7 +762,7 @@ class LoadImagesAndLabels_sr(Dataset):  # for training/testing
                 elif mini > 1:
                     shapes[i] = [1, 1 / mini]
 
-            self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(64) * stride
+            self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(np.int64) * stride
 
         # Cache images into memory for faster training (WARNING: large datasets may exceed system RAM)
         self.imgs = [None] * n

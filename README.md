@@ -85,8 +85,13 @@ python train.py --cfg models/SRyolo_noFocus_small.yaml --train_img_size 512 --da
 
 ```python
 python train.py --cfg models/SRyolo_noFocus_small.yaml --train_img_size 512 --data data/SRvedai.yaml --ch 3 --input_mode IR
-```
 
+```
+#### 5.1 Use LLVIP and M3FD datasets
+```
+python train.py --data SRllvip.yaml
+python train.py --data SRm3fd.yaml
+```
 
 ## Test
 

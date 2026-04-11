@@ -239,13 +239,13 @@ def test(data,
 
         # Plot images
         if plots: #and batch_i < 3: #zjq
-            f = save_dir / f'test_batch{batch_i}_labels.png'  # labels
+            f = save_dir / f'test_batch{batch_i}_{paths[0].split('/')[-1].replace('.png','')}_labels.png'  # labels
             # f = '/home/data/zhangjiaqing/dataset/VEDAI/train_label/'+paths[0].split('/')[-1].replace('_co','_label') #zjq
             if input_mode == 'IR':
                 Thread(target=plot_images, args=(ir, targets, paths, f, names), daemon=True).start()
             else:
                 Thread(target=plot_images, args=(img, targets, paths, f, names), daemon=True).start()
-            f = save_dir / f'test_batch{batch_i}_pred.png'  # predictions
+            f = save_dir / f'test_batch{batch_i}_{paths[0].split('/')[-1].replace('.png','')}_pred.png'  # predictions
             if input_mode == 'IR':
                 Thread(target=plot_images, args=(ir, output_to_target(out), paths, f, names), daemon=True).start()
             else:
@@ -311,7 +311,7 @@ def test(data,
     # Save JSON
     if save_json and len(jdict):
         w = Path(weights[0] if isinstance(weights, list) else weights).stem if weights is not None else ''  # weights
-        anno_json = '../coco/annotations/instances_val2017.json'  # annotations json
+        anno_json = 'coco/annotations/instances_val2017.json'  # annotations json
         pred_json = str(save_dir / f"{w}_predictions.json")  # predictions json
         print('\nEvaluating pycocotools mAP... saving %s...' % pred_json)
         with open(pred_json, 'w') as f:
@@ -354,7 +354,7 @@ if __name__ == '__main__':
     parser.add_argument('--conf-thres', type=float, default=0.001, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.6, help='IOU threshold for NMS')
     parser.add_argument('--task', default='val', help='train, val, test, speed or study')
-    parser.add_argument('--device', default='1', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--single-cls', action='store_true', help='treat as single-class dataset')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--verbose', action='store_true', help='report mAP by class')
