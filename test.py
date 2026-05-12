@@ -16,7 +16,6 @@ from utils.general import coco80_to_coco91_class, check_dataset, check_file, che
 from utils.metrics import ap_per_class, ConfusionMatrix
 from utils.plots import plot_images, output_to_target, plot_study_txt
 from utils.torch_utils import select_device, time_synchronized
-
 from torchvision import transforms
 from PIL import Image
 unloader = transforms.ToPILImage()
@@ -47,8 +46,15 @@ def test(data,
          plots=True,
          wandb_logger=None,
          compute_loss=None,
-         is_coco=False):
+         is_coco=False,
+         early_stopping=False,
+         earlyStopping=None,
+         final_epoch=False,
+         det_labels=False,
+         val=False
+         ):
     # Initialize/load model and set device
+    plot_threads = []  # Add at top of test function
     training = model is not None
     if training:  # called by train.py
         device = next(model.parameters()).device  # get model device
@@ -141,7 +147,9 @@ def test(data,
 
             # Compute loss
             if compute_loss:
-                loss += compute_loss([x.float() for x in train_out], targets)[1][:3]  # box, obj, cls
+                # loss += compute_loss([x.float() for x in train_out], targets)[1][:3]  # box, obj, cls
+                total_loss , lbox , lobj , lcls = compute_loss([x.float() for x in train_out], targets)  # box, obj, cls
+                loss += torch.cat([lbox, lobj, lcls]).detach()
 
             # Run NMS
             targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)  # to pixels
@@ -237,19 +245,20 @@ def test(data,
             # Append statistics (correct, conf, pcls, tcls)
             stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
 
-        # Plot images
-        if plots: #and batch_i < 3: #zjq
+        # Plot images (only first 10 batches to prevent memory exhaustion)
+        # if plots and (final_epoch or (wandb_logger and wandb_logger.current_epoch % 10 == 0)):
+        if plots and batch_i % 2 == 0:
             f = save_dir / f'test_batch{batch_i}_{paths[0].split('/')[-1].replace('.png','')}_labels.png'  # labels
             # f = '/home/data/zhangjiaqing/dataset/VEDAI/train_label/'+paths[0].split('/')[-1].replace('_co','_label') #zjq
             if input_mode == 'IR':
-                Thread(target=plot_images, args=(ir, targets, paths, f, names), daemon=True).start()
+                Thread(target=plot_images, args=(ir, targets, targets, paths, f, names, final_epoch, early_stopping, earlyStopping, det_labels, val), daemon=True).start()
             else:
-                Thread(target=plot_images, args=(img, targets, paths, f, names), daemon=True).start()
+                Thread(target=plot_images, args=(img, targets, targets, paths, f, names, final_epoch, early_stopping, earlyStopping, det_labels, val), daemon=True).start()
             f = save_dir / f'test_batch{batch_i}_{paths[0].split('/')[-1].replace('.png','')}_pred.png'  # predictions
             if input_mode == 'IR':
-                Thread(target=plot_images, args=(ir, output_to_target(out), paths, f, names), daemon=True).start()
+                Thread(target=plot_images, args=(ir, output_to_target(out), targets, paths, f, names, final_epoch, early_stopping, earlyStopping, det_labels, val), daemon=True).start()
             else:
-                Thread(target=plot_images, args=(img, output_to_target(out), paths, f, names), daemon=True).start()
+                Thread(target=plot_images, args=(img, output_to_target(out), targets, paths, f, names, final_epoch, early_stopping, earlyStopping, det_labels, val), daemon=True).start()
     # Compute statistics
     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
     if len(stats) and stats[0].any():
@@ -276,7 +285,7 @@ def test(data,
     worksheet.write(0,4,mr*100)
     worksheet.write(0,5,map50*100)
     worksheet.write(0,6,map*100)
-    
+
 
 
     # Print results per class
@@ -341,7 +350,11 @@ def test(data,
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
-    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
+    if early_stopping:
+        if earlyStopping(loss[0] + loss[1] + loss[2]):
+            print(f"Early stopping triggered. No improvement in validation performance for {earlyStopping.counter} epochs.")
+            return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t, True
+    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t, False
 
 
 if __name__ == '__main__':
@@ -364,6 +377,7 @@ if __name__ == '__main__':
     parser.add_argument('--save-json', action='store_true', help='save a cocoapi-compatible JSON results file')
     parser.add_argument('--project', default='runs/test', help='save to project/name')
     parser.add_argument('--name', default='exp', help='save to project/name')
+    parser.add_argument('--det_labels', action='store_true', help='show detection confidence score labels during training and testing')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     opt = parser.parse_args()
     opt.save_json |= opt.data.endswith('coco.yaml')
@@ -385,6 +399,8 @@ if __name__ == '__main__':
             save_txt=opt.save_txt | opt.save_hybrid,
             save_hybrid=opt.save_hybrid,
             save_conf=opt.save_conf,
+            det_labels=opt.det_labels,
+            val=opt.task,
             )
 
     elif opt.task == 'speed':  # speed benchmarks
