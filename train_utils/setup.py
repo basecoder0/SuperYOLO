@@ -16,6 +16,12 @@ def setup_directories(save_dir):
     last = wdir / 'last.pt'
     best = wdir / 'best.pt'
     results_file = save_dir / 'results.txt'
+
+    with open(results_file, 'w') as f:
+        f.write(('%10s' * 2 + '%10s' * 6 + '%10s' * 7 + '\n') % 
+                ('Epoch', 'gpu_mem', 'box', 'obj', 'cls', 'total', 'labels', 'img_size',
+                'P', 'R', 'mAP@.5', ' mAP@.5:.95', 'val_box', 'val_obj', 'val_cls'))
+        f.close()
     
     return last, best, results_file
 

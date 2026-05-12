@@ -1,0 +1,23 @@
+TODO: Update the following YAML configuration to reflect the new experiments and dataset details. Remove any entries that are no longer relevant and ensure that all paths and parameters are accurate for the current setup.
+# Experiments:
+#     Ground Truth Directories:
+#         VEDAI: "dataset/VEDAI/labels"
+#         LLVIP: "dataset/LLVIP/labels"
+#         M3FD: "dataset/M3FD/labels"
+#     Image Directories:
+#         VEDAI: "dataset/VEDAI/images"
+#         LLVIP: "dataset/LLVIP/images"
+#         M3FD: "dataset/M3FD/images"
+#     Output Directory: "runs/roc"
+#     Image Dimensions:
+#         VEDAI: [ 512, 512 ]
+#         LLVIP: [ 1280, 1024 ]
+#         M3FD: [ 1024, 780 ]
+#     Total Image Area:
+#         VEDAI: VEDAI[0] * VEDAI[1]
+#         LLVIP: LLVIP[0] * LLVIP[1]
+#         M3FD: M3FD[0] * M3FD[1]
+#     IoU Threshold: 0.5
+
+# Fixed Thresholds:
+#     thresholds: [ 1e-7, 1e-6, 1e-5 ]

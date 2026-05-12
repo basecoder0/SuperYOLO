@@ -13,7 +13,7 @@ from optimizer import set_weight_decay
 logger = logging.getLogger(__name__)
 
 
-def build_model(opt, hyp, weights, nc, data_dict, device, rank):
+def build_model(opt, hyp, weights, nc, data_dict, device, rank, show_model=False):
     """Build and load model (pretrained or from scratch)
     
     Args:
@@ -24,7 +24,7 @@ def build_model(opt, hyp, weights, nc, data_dict, device, rank):
         data_dict: Dataset configuration dictionary
         device: torch device
         rank: Process rank for distributed training
-        
+        show_model: Whether to print the model architecture
     Returns:
         model: Initialized model
         train_path: Path to training data
@@ -74,7 +74,8 @@ def build_model(opt, hyp, weights, nc, data_dict, device, rank):
     train_path = data_dict['train']
     test_path = data_dict['val']
 
-    print(f'\n\nModel Architecture: {model}\n\n')
+    if show_model:
+        print(f'\n\nModel Architecture: {model}\n\n')
     
     return model, train_path, test_path, ckpt, pretrained, down_factor
 

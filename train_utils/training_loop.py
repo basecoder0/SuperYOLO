@@ -17,6 +17,7 @@ import test
 from utils.general import fitness, labels_to_image_weights
 from utils.plots import plot_images, plot_results
 from utils.torch_utils import is_parallel
+from train_utils.earlyStopping import EarlyStopper
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,10 @@ def start_training_loop(
     # Validation state
     maps, results, is_coco,
     # Learning rate function
-    lf
+    lf, 
+    # Early stopping parameters
+    early_stopping, early_stopping_patience,
+    early_stopping_min_delta, det_labels
 ):
     """Main training loop for SuperYOLO
     
@@ -85,36 +89,16 @@ def start_training_loop(
         results: Validation results tuple
         is_coco: Whether dataset is COCO
         lf: Learning rate lambda function
-        
+        early_stopping: Early stopping boolan flag
+        early_stopping_patience: Number of epochs with no improvement after which training will be stopped
+        early_stopping_min_delta: Minimum change in the monitored quantity to qualify as an improvement for early stopping
+        det_labels: Display Detection labels
     Returns:
         Tuple of (best_fitness, epoch): Updated best fitness value and final epoch number
     """
+    earlyStopping = EarlyStopper(early_stopping_patience, early_stopping_min_delta)
+
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        # T_min, T_max = 1e-1, 1e1
-        # t = Log_UP(T_min, T_max, epoch)
-        # if (t < 1):
-        #     k = 1 / t
-        # else:
-        #     k = torch.tensor([1]).float().to(device)
-        # for idx,(name,m) in enumerate(model.named_modules()): #k t
-        #     if isinstance(m,nn.Conv2d):
-        #         print(m)
-        #         m.k=k
-        #         m.t=t
-                # print(m.weight.shape)
-                # print(m.bias.shape)
-        # model.module.conv0.k = k
-        # model.module.conv1.k = k
-        # model.module.conv2.k = k
-        # model.module.conv3.k = k
-        # model.module.conv4.k = k
-        # model.module.conv5.k = k
-        # model.module.conv0.t = t
-        # model.module.conv1.t = t
-        # model.module.conv2.t = t
-        # model.module.conv3.t = t
-        # model.module.conv4.t = t
-        # model.module.conv5.t = t
         model.train()
 
         # Update image weights (optional)
@@ -244,7 +228,7 @@ def start_training_loop(
                 # Plot
                 if plots and ni < 3:
                     f = save_dir / f'train_batch{ni}.jpg'  # filename
-                    Thread(target=plot_images, args=(imgs, targets, paths, f), daemon=True).start()
+                    Thread(target=plot_images, args=(imgs, targets, targets, paths, f, ), daemon=True).start()
                     # if tb_writer:
                     #     tb_writer.add_image(f, result, dataformats='HWC', global_step=epoch)
                     #     tb_writer.add_graph(model, imgs)  # add model to tensorboard
@@ -267,20 +251,25 @@ def start_training_loop(
             final_epoch = epoch + 1 == epochs
             if not opt.notest or final_epoch:  # Calculate mAP
                 wandb_logger.current_epoch = epoch + 1
-                results, maps, times = test.test(data_dict,
+                results, maps, times, e_stop = test.test(data_dict,
                                                  batch_size=batch_size * 2,
                                                  imgsz=imgsz_test,
                                                  input_mode = opt.input_mode,
                                                  model=ema.ema,
                                                  single_cls=opt.single_cls,
-                                                 save_json=True,
+                                                 save_json=is_coco and (e_stop or final_epoch),
                                                  dataloader=testloader,
                                                  save_dir=save_dir,
-                                                 verbose=nc < 50 and final_epoch,
-                                                 plots=plots and final_epoch,
+                                                 verbose=nc < 50 and (final_epoch or early_stopping),
+                                                 plots=plots and (final_epoch or early_stopping),  # Plot on final epoch or when early stopping is enabled
                                                  wandb_logger=wandb_logger,
                                                  compute_loss=compute_loss,
-                                                 is_coco=is_coco)
+                                                 is_coco=is_coco,
+                                                 early_stopping=early_stopping,
+                                                 earlyStopping=earlyStopping,
+                                                 final_epoch=final_epoch,
+                                                 det_labels=det_labels
+                                                )
 
             # Write
             with open(results_file, 'a') as f:
@@ -332,6 +321,11 @@ def start_training_loop(
                         wandb_logger.log_model(
                             last.parent, opt, epoch, fi, best_model=best_fitness == fi)
                 del ckpt
+
+        if e_stop:
+            print('*' * 30)
+            logger.info("Early stopping triggered. Stopping training...")
+            break
 
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training

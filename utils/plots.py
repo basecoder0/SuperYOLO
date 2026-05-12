@@ -25,7 +25,6 @@ from utils.metrics import fitness
 matplotlib.rc('font', **{'size': 11})
 matplotlib.use('Agg')  # for writing to files only
 
-
 def color_list():
     # Return first 10 plt colors as (r,g,b) https://stackoverflow.com/questions/51350872/python-from-color-name-to-rgb
     def hex2rgb(h):
@@ -53,19 +52,57 @@ def butter_lowpass_filtfilt(data, cutoff=1500, fs=50000, order=5):
     b, a = butter_lowpass(cutoff, fs, order=order)
     return filtfilt(b, a, data)  # forward-backward filter
 
+def draw_dashed_rect(img, pt1, pt2, color, thickness=1, dash_length=8):
+    x1, y1 = pt1
+    x2, y2 = pt2
+    for x in range(x1, x2, dash_length * 2):
+        cv2.line(img, (x, y1), (min(x + dash_length, x2), y1), color, thickness)
+        cv2.line(img, (x, y2), (min(x + dash_length, x2), y2), color, thickness)
+    for y in range(y1, y2, dash_length * 2):
+        cv2.line(img, (x1, y), (x1, min(y + dash_length, y2)), color, thickness)
+        cv2.line(img, (x2, y), (x2, min(y + dash_length, y2)), color, thickness)
+
+def add_legends(image, legend_color_list, legend_labels, box_size=40, spacing=10, text_color=(0, 0, 0), offset_x=0, offset_y=0, img_width=None, img_height=None):
+
+  img = image.copy()
+
+  # Use provided image dimensions or fall back to entire image
+  w = img_width if img_width is not None else img.shape[1]
+  h = img_height if img_height is not None else img.shape[0]
+
+  x = offset_x + int(w * 1.2)   # 99% from left within the specific image block
+  y = offset_y + int(h * 0.04)   # 4% from top within the specific image block
+
+  for color, label in zip(legend_color_list, legend_labels):
+      # Draw color box
+      cv2.rectangle(img, (x, y), (x + box_size, y + box_size), color, -1)
+
+      # Put text next to the box
+      cv2.putText(img, label, (x + box_size + 10, y + box_size - 10),
+                  cv2.FONT_HERSHEY_SIMPLEX, 1, text_color, 2, cv2.LINE_AA)
+
+      # Move to the next entry
+      y += box_size + spacing
+
+  return img
 
 def plot_one_box(x, img, color=None, label=None, line_thickness=3):
-    # Plots one bounding box on image img
+    # Plots one bounding box on image img with optional GT bbox overlay
     tl = line_thickness or round(0.002 * (img.shape[0] + img.shape[1]) / 2) #+ 1  # line/font thickness
     color = color or [random.randint(0, 255) for _ in range(3)]
+
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
+    alpha = 0.2  # transparency for predicted boxes (reduced for better GT visibility)
+    overlay = img.copy()
     cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
+    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
+
     if label:
         tf = max(tl - 1, 1)  # font thickness 在这设置可视化字体的粗细
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 2, thickness=tf)[0] #fontScale字体的大小
         c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
         cv2.rectangle(img, c1, c2, color, -1, cv2.LINE_AA)  # filled
-        cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 2, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA) #可修改字体颜色
+        cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 2, [0, 0, 0], thickness=tf, lineType=cv2.LINE_AA) #可修改字体颜色
 
 
 def plot_one_box_PIL(box, img, color=None, label=None, line_thickness=None):
@@ -110,10 +147,47 @@ def output_to_target(output):
             targets.append([i, cls, *list(*xyxy2xywh(np.array(box)[None])), conf])
     return np.array(targets)
 
+def process_bbox(targets, block_x, block_y, w, h, scale_factor, index):
+    if len(targets) > 0:
+        image_targets = targets[targets[:, 0] == index]
+        boxes = xywh2xyxy(image_targets[:, 2:6]).T
+        classes = image_targets[:, 1].astype('int')
+        labels = image_targets.shape[1] == 6  # labels if no conf column
+        conf = None if labels else image_targets[:, 6]  # check for confidence presence (label vs pred)
 
-def plot_images(images, targets, paths=None, fname='images.png', names=None, max_size=640, max_subplots=16):
+        if boxes.shape[1]:
+            if boxes.max() <= 1.01:  # if normalized with tolerance 0.01
+                boxes[[0, 2]] *= w  # scale to pixels
+                boxes[[1, 3]] *= h
+            elif scale_factor < 1:  # absolute coords need scale if image scales
+                boxes *= scale_factor
+        boxes[[0, 2]] += block_x
+        boxes[[1, 3]] += block_y
+    else:
+        boxes = np.array([]).reshape(4, 0)
+        classes = np.array([])
+        labels = True
+        conf = None
+    return boxes, classes, labels, conf
+
+def isEqual(targets, gnd_trs):
+    # Check if targets and ground truths are equal (for testing)
+    # Predictions have 7 cols [img_id, cls, x, y, w, h, conf], GT has 6 cols [img_id, cls, x, y, w, h]
+    if len(targets) != len(gnd_trs):
+        return False
+    if len(targets) == 0:
+        return True
+    # If shapes differ (predictions vs GT), they're not equal
+    if targets.shape[1] != gnd_trs.shape[1]:
+        return False
+    for t, g in zip(targets, gnd_trs):
+        if not np.allclose(t, g, atol=1e-6):
+            return False
+    return True
+
+def plot_images(images, targets, gnd_trs=None, paths=None, fname='images.png', names=None,
+                final_epoch=False, early_stopping=False, earlyStopping=None, det_labels=False, val=False, max_size=640, max_subplots=16):
     # Plot image grid with labels
-
     if isinstance(images, torch.Tensor):
         images = images.cpu().float().numpy()
     if isinstance(targets, torch.Tensor):
@@ -150,27 +224,48 @@ def plot_images(images, targets, paths=None, fname='images.png', names=None, max
 
         mosaic[block_y:block_y + h, block_x:block_x + w, :] = img
         if len(targets) > 0:
-            image_targets = targets[targets[:, 0] == i]
-            boxes = xywh2xyxy(image_targets[:, 2:6]).T
-            classes = image_targets[:, 1].astype('int')
-            labels = image_targets.shape[1] == 6  # labels if no conf column
-            conf = None if labels else image_targets[:, 6]  # check for confidence presence (label vs pred)
+            p_boxes, p_classes, p_labels, p_conf = process_bbox(targets, block_x, block_y, w, h, scale_factor, index=i)
 
-            if boxes.shape[1]:
-                if boxes.max() <= 1.01:  # if normalized with tolerance 0.01
-                    boxes[[0, 2]] *= w  # scale to pixels
-                    boxes[[1, 3]] *= h
-                elif scale_factor < 1:  # absolute coords need scale if image scales
-                    boxes *= scale_factor
-            boxes[[0, 2]] += block_x
-            boxes[[1, 3]] += block_y
-            for j, box in enumerate(boxes.T):
-                cls = int(classes[j])
+            # Collect all unique classes present in this image (from both GT and predictions)
+            all_classes = set()
+
+            # Draw GT boxes if final epoch or early stopping triggered (to avoid clutter/OOM during training)
+            if (final_epoch or (early_stopping and (earlyStopping and earlyStopping.counter >= earlyStopping.patience - 1)) or val):
+                if isinstance(gnd_trs, torch.Tensor):
+                    gnd_trs = gnd_trs.cpu().numpy()
+
+                if not isEqual(targets, gnd_trs):
+                    g_boxes, g_classes, _, _ = process_bbox(gnd_trs, block_x, block_y, w, h, scale_factor, index=i)
+                else:
+                    g_boxes = np.array([]).reshape(4, 0)
+                    g_classes = np.array([])
+
+                if g_boxes.shape[1] > 0:
+                    # Draw all ground truth boxes first (green dashed, more visible)
+                    for k in range(g_boxes.shape[1]):
+                        gcls = int(g_classes[k])
+                        g_c1 = (int(g_boxes[0, k]), int(g_boxes[1, k]))
+                        g_c2 = (int(g_boxes[2, k]), int(g_boxes[3, k]))
+                        draw_dashed_rect(mosaic, g_c1, g_c2, (0, 255, 0), thickness=2)
+                        all_classes.add(gcls)
+
+            # Draw predictions (class colors, semi-transparent)
+            for j, p_box in enumerate(p_boxes.T):
+                cls = int(p_classes[j])
                 color = colors[cls % len(colors)]
-                cls = names[cls] if names else cls
-                if labels or conf[j] > 0.25:  # 0.25 conf thresh
-                    label = '%s' % cls if labels else '%s %.1f' % (cls, conf[j])
-                    plot_one_box(box, mosaic, label=label, color=color, line_thickness=tl)
+                if p_labels or p_conf[j] > 0.25:  # 0.25 conf thresh
+                    all_classes.add(cls)
+                    cls_name = names[cls] if names else cls
+                    label = '%s' % cls_name if p_labels else '%s %.1f' % (cls_name, p_conf[j])
+                    plot_one_box(p_box, mosaic, label=label if det_labels else None, color=color, line_thickness=tl)
+
+            # Add ONE unified legend for all classes present in this image
+            if len(all_classes) > 0 and names is not None:
+                all_classes = sorted(all_classes)  # Sort for consistent order
+                legend_colors = [colors[cls % len(colors)] for cls in all_classes]
+                legend_labels = [names[cls] for cls in all_classes]
+                mosaic = add_legends(mosaic, legend_colors, legend_labels, box_size=30, spacing=5,
+                                    offset_x=block_x, offset_y=block_y, img_width=w, img_height=h)
 
         # Draw image filename labels
         # if paths: #00000010_co.png
@@ -379,7 +474,7 @@ def plot_results_overlay(start=0, stop=0):  # from utils.plots import *; plot_re
     s = ['train', 'train', 'train', 'Precision', 'mAP@0.5', 'val', 'val', 'val', 'Recall', 'mAP@0.5:0.95']  # legends
     t = ['Box', 'Objectness', 'Classification', 'P-R', 'mAP-F1']  # titles
     for f in sorted(glob.glob('results*.txt') + glob.glob('../../Downloads/results*.txt')):
-        results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
+        results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2, skiprows=1).T
         n = results.shape[1]  # number of rows
         x = range(start, min(stop, n) if stop else n)
         fig, ax = plt.subplots(1, 5, figsize=(14, 3.5), tight_layout=True)
@@ -401,8 +496,8 @@ def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
     # Plot training 'results*.txt'. from utils.plots import *; plot_results(save_dir='runs/train/exp')
     fig, ax = plt.subplots(2, 5, figsize=(12, 6), tight_layout=True)
     ax = ax.ravel()
-    s = ['Box', 'Objectness', 'Classification', 'Precision', 'Recall',
-        'val Box', 'val Objectness', 'val Classification', 'mAP@0.5', 'mAP@0.5:0.95']
+    s = ['Train Box Loss', 'Train Objectness Loss', 'Train Classification Loss', 'Precision', 'Recall',
+        'Val Box Loss', 'Val Objectness Loss', 'Val Classification Loss', 'mAP@0.5', 'mAP@0.5:0.95']
     if bucket:
         # files = ['https://storage.googleapis.com/%s/results%g.txt' % (bucket, x) for x in id]
         files = ['results%g.txt' % x for x in id]
@@ -413,7 +508,7 @@ def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
     assert len(files), 'No results.txt files found in %s, nothing to plot.' % os.path.abspath(save_dir)
     for fi, f in enumerate(files):
         try:
-            results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
+            results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2, skiprows=1).T # Skips header row
             n = results.shape[1]  # number of rows
             x = range(start, min(stop, n) if stop else n)
             for i in range(10):
