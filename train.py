@@ -262,6 +262,7 @@ if __name__ == '__main__':
     parser.add_argument('--image-weights', action='store_true', help='use weighted image selection for training')
     parser.add_argument('--det_labels', action='store_true', help='show detection confidence score labels during training and testing')
     parser.add_argument('--show-model', action='store_true', help='print model architecture')
+    parser.add_argument('--save_json', action='store_true', help='save a cocoapi-compatible JSON results file')
 
     # Early Stoping options
     parser.add_argument('--early_stp', action='store_true', help='Enable early stopping based on validation performance')
