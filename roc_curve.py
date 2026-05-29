@@ -42,22 +42,25 @@ from sklearn.metrics import auc
 # IMAGE_WIDTH = 1024 # M3FD original image width
 # IMAGE_HEIGHT = 780  # M3FD original image height
 
+DATASET_NAME = "VEDAI"  # Change this to VEDAI, LLVIP, or M3FD as needed
+
 EXPERIMENTS = {
-    'roc1': 'runs/test/test_MF_vedai_SR_300ep/best_predictions.json',
-    'roc2': 'runs/test/test_PIX_FUS_vedai_SR_300ep/best_predictions.json',
-    'roc3': 'runs/test/test_FEAT_FUS_mdf1_vedai_SR_300ep/best_predictions.json',
-    'roc4': 'runs/test/test_FEAT_FUS_mdf2_vedai_SR_300ep/best_predictions.json',
-    'roc5': 'runs/test/test_FEAT_FUS_mdf3_vedai_SR_300ep/best_predictions.json',
-    'roc6': 'runs/test/test_FEAT_FUS_mdf4_vedai_SR_300ep/best_predictions.json',
+    'roc1': 'runs/test/test_MF_vedai_noSR_300ep/best_predictions.json',
+    'roc2': 'runs/test/test_PIX_FUS_vedai_noSR_300ep/best_predictions.json',
+    'roc3': 'runs/test/test_FEAT_FUS_mdf4_vedai_noSR_300ep/best_predictions.json',
+
+    'roc4': 'runs/train/MF_vedai_noSR_300ep/best_train_predictions.json',
+    'roc5': 'runs/train/PIX_FUS_vedai_noSR_300ep/best_train_predictions.json',
+    'roc6': 'runs/train/FEAT_FUS_mdf4_vedai_noSR_300ep/best_train_predictions.json',
 }
 
 GROUND_TRUTH_DIR =  {
-    'roc1': "dataset/VEDAI/labels",
-    'roc2': "dataset/VEDAI/labels",
-    'roc3': "dataset/VEDAI/labels",
-    'roc4': "dataset/VEDAI/labels",
-    'roc5': "dataset/VEDAI/labels",
-    'roc6': "dataset/VEDAI/labels",
+    'roc1': f"dataset/{DATASET_NAME}/labels",
+    'roc2': f"dataset/{DATASET_NAME}/labels",
+    'roc3': f"dataset/{DATASET_NAME}/labels",
+    'roc4': f"dataset/{DATASET_NAME}/labels",
+    'roc5': f"dataset/{DATASET_NAME}/labels",
+    'roc6': f"dataset/{DATASET_NAME}/labels",
 }
 # GROUND_TRUTH_DIR =  {
 #     'roc1': "dataset/VEDAI/labels",
@@ -65,12 +68,12 @@ GROUND_TRUTH_DIR =  {
 #     'roc3': "dataset/M3FD/labels",
 # }
 IMAGES_DIR = {
-    'roc1': "dataset/VEDAI/images",
-    'roc2': "dataset/VEDAI/images",
-    'roc3': "dataset/VEDAI/images",
-    'roc4': "dataset/VEDAI/images",
-    'roc5': "dataset/VEDAI/images",
-    'roc6': "dataset/VEDAI/images",
+    'roc1': f"dataset/{DATASET_NAME}/images",
+    'roc2': f"dataset/{DATASET_NAME}/images",
+    'roc3': f"dataset/{DATASET_NAME}/images",
+    'roc4': f"dataset/{DATASET_NAME}/images",
+    'roc5': f"dataset/{DATASET_NAME}/images",
+    'roc6': f"dataset/{DATASET_NAME}/images",
 }
 # IMAGES_DIR = {
 #     'roc1': "dataset/VEDAI/images",
@@ -108,12 +111,12 @@ IMAGE_HEIGHT = {
 # }
 
 DATASET_MAP = {
-    'roc1': 'VEDAI',
-    'roc2': 'VEDAI',
-    'roc3': 'VEDAI',
-    'roc4': 'VEDAI',
-    'roc5': 'VEDAI',
-    'roc6': 'VEDAI',
+    'roc1': DATASET_NAME,
+    'roc2': DATASET_NAME,
+    'roc3': DATASET_NAME,
+    'roc4': DATASET_NAME,
+    'roc5': DATASET_NAME,
+    'roc6': DATASET_NAME,
 }
 
 # DATASET_MAP = {
@@ -128,28 +131,28 @@ FIXED_FA_THRESHOLDS = [1e-8, 1e-7, 1e-6]
 MAX_IMAGES_PER_THRESHOLD = 100 # Maximum number of example images to save per FA threshold
 FA_THRESHOLD_DIRS = {
     'roc1': {
-        'parent_dir': f"{OUTPUT_DIR}/VEDAI/",
+        'parent_dir': f"{OUTPUT_DIR}/{DATASET_NAME}/",
         'modality_dir_MF': "MF/",
 
     },
     'roc2': {
-        'parent_dir': f"{OUTPUT_DIR}/VEDAI/",
+        'parent_dir': f"{OUTPUT_DIR}/{DATASET_NAME}/",
         'modality_dir_MF': "PIX_FUS/",
     },
     'roc3': {
-        'parent_dir': f"{OUTPUT_DIR}/VEDAI/",
+        'parent_dir': f"{OUTPUT_DIR}/{DATASET_NAME}/",
         'modality_dir_MF': "FEAT_FUS_mdf1/",
     },
     'roc4': {
-        'parent_dir': f"{OUTPUT_DIR}/VEDAI/",
+        'parent_dir': f"{OUTPUT_DIR}/{DATASET_NAME}/",
         'modality_dir_MF': "FEAT_FUS_mdf2/",
     },
     'roc5': {
-        'parent_dir': f"{OUTPUT_DIR}/VEDAI/",
+        'parent_dir': f"{OUTPUT_DIR}/{DATASET_NAME}/",
         'modality_dir_MF': "FEAT_FUS_mdf3/",
     },
     'roc6': {
-        'parent_dir': f"{OUTPUT_DIR}/VEDAI/",
+        'parent_dir': f"{OUTPUT_DIR}/{DATASET_NAME}/",
         'modality_dir_MF': "FEAT_FUS_mdf4/",
     },
 

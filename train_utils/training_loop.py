@@ -41,13 +41,13 @@ def start_training_loop(
     # Validation state
     maps, results, is_coco,
     # Learning rate function
-    lf, 
+    lf,
     # Early stopping parameters
     early_stopping, early_stopping_patience,
     early_stopping_min_delta, det_labels
 ):
     """Main training loop for SuperYOLO
-    
+
     Args:
         start_epoch: Starting epoch number
         epochs: Total number of epochs to train
@@ -97,6 +97,7 @@ def start_training_loop(
         Tuple of (best_fitness, epoch): Updated best fitness value and final epoch number
     """
     earlyStopping = EarlyStopper(early_stopping_patience, early_stopping_min_delta)
+    e_stop = None  # Early stopping flag
 
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         model.train()
@@ -163,7 +164,7 @@ def start_training_loop(
                 sf = sz / max(imgs.shape[2:])  # scale factor
                 if sf != 1:
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to gs-multiple)
-                    imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False) 
+                    imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
                     irs = F.interpolate(irs, size=ns, mode='bilinear', align_corners=False) #zjq
 
             # Forward
@@ -179,10 +180,10 @@ def start_training_loop(
                     pred,_ = model(imgs,irs,opt.input_mode)
                 # t1 = time.time()
                 # print(t1-t0)
-                    
+
                 loss, lbox , lobj , lcls  = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
                 loss_items = torch.cat((lbox, lobj, lcls, loss)).detach()
-                if opt.super: #and not opt.attention and not opt.super_attention:    
+                if opt.super: #and not opt.attention and not opt.super_attention:
                     if opt.input_mode =='IR':
                         sr_loss = 0.1*torch.nn.L1Loss()(output_sr,ir_image)
                     elif opt.input_mode =='RGB':
@@ -190,7 +191,7 @@ def start_training_loop(
                     else:
                         sr_loss = 0.1*(torch.nn.L1Loss()(output_sr[:,0:3,:,:,],image)+torch.nn.L1Loss()(output_sr[:,3:,:,:,],ir_image[:,0:1,:,:,]))
                     loss += sr_loss
-                # if (opt.super or opt.super_attention) and opt.attention:        
+                # if (opt.super or opt.super_attention) and opt.attention:
                 #     if opt.input_mode =='IR':
                 #         sr_loss = 0.01*torch.nn.MSELoss()(output_sr,ir_image)
                 #     elif opt.input_mode =='RGB':
@@ -200,7 +201,7 @@ def start_training_loop(
                 #     loss += sr_loss
                 # if opt.cal_att_loss:
                 #     att_loss = attention_loss(imgs.shape,attention_mask, targets)
-                #     loss += 0.01*att_loss                    
+                #     loss += 0.01*att_loss
                 if rank != -1:
                     loss *= opt.world_size  # gradient averaged between devices in DDP mode
                 if opt.quad:
@@ -251,13 +252,14 @@ def start_training_loop(
             final_epoch = epoch + 1 == epochs
             if not opt.notest or final_epoch:  # Calculate mAP
                 wandb_logger.current_epoch = epoch + 1
+
                 results, maps, times, e_stop = test.test(data_dict,
                                                  batch_size=batch_size * 2,
                                                  imgsz=imgsz_test,
                                                  input_mode = opt.input_mode,
                                                  model=ema.ema,
                                                  single_cls=opt.single_cls,
-                                                 save_json=is_coco and (e_stop or final_epoch),
+                                                 save_json=(is_coco or opt.save_json) and (e_stop or final_epoch or early_stopping),
                                                  dataloader=testloader,
                                                  save_dir=save_dir,
                                                  verbose=nc < 50 and (final_epoch or early_stopping),
@@ -268,7 +270,8 @@ def start_training_loop(
                                                  early_stopping=early_stopping,
                                                  earlyStopping=earlyStopping,
                                                  final_epoch=final_epoch,
-                                                 det_labels=det_labels
+                                                 det_labels=det_labels,
+                                                 isTrain=True
                                                 )
 
             # Write
@@ -329,5 +332,5 @@ def start_training_loop(
 
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training
-    
+
     return best_fitness, epoch
